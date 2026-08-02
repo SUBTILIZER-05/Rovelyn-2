@@ -1,8 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
-import { supabase } from './supabaseClient';
-import { useAuth } from '../context/AuthContext';
-
-const STORAGE_KEY = 'rovelyn_study_sessions_v1';
+import { useAppData } from '../context/AppDataContext';
 
 // Helper to normalize session object
 export function normalizeSession(s) {
@@ -33,131 +29,25 @@ export function normalizeSession(s) {
   };
 }
 
-export function loadSessionsFromStorage() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        return parsed.map(normalizeSession);
-      }
-    }
-  } catch (e) {
-    console.error('Failed to load study sessions from localStorage:', e);
-  }
-  return [];
-}
-
-export function saveSessionsToStorage(sessions) {
-  try {
-    const normalized = sessions.map(normalizeSession);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-    window.dispatchEvent(new Event('study_sessions_updated'));
-    return normalized;
-  } catch (e) {
-    console.error('Failed to save study sessions to localStorage:', e);
-    return sessions;
-  }
-}
-
 export function useStudySessions() {
-  const auth = useAuth();
-  const user = auth?.user ?? null;
-  const [sessions, setSessions] = useState(() => loadSessionsFromStorage());
-
-  const fetchUserData = useCallback(async () => {
-    if (!user?.id) {
-      setSessions(loadSessionsFromStorage());
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('user_sessions')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (!error && data) {
-        // DO NOT fall back to mock constants if data.length === 0. Returns [] for new users.
-        const normalized = data.map(normalizeSession);
-        setSessions(normalized);
-        saveSessionsToStorage(normalized);
-      } else {
-        setSessions(loadSessionsFromStorage());
-      }
-    } catch (err) {
-      console.error('Supabase fetch user_sessions error:', err);
-      setSessions(loadSessionsFromStorage());
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
-    fetchUserData();
-  }, [fetchUserData]);
-
-  useEffect(() => {
-    const handleUpdate = () => {
-      setSessions(loadSessionsFromStorage());
-    };
-
-    window.addEventListener('storage', handleUpdate);
-    window.addEventListener('study_sessions_updated', handleUpdate);
-    return () => {
-      window.removeEventListener('storage', handleUpdate);
-      window.removeEventListener('study_sessions_updated', handleUpdate);
-    };
-  }, []);
-
-  const addSession = useCallback((sessionData) => {
-    const current = loadSessionsFromStorage();
-    const newSess = normalizeSession({
-      ...sessionData,
-      date: sessionData.date || new Date().toISOString().split('T')[0],
-      timestamp: sessionData.timestamp || Date.now(),
-      user_id: user?.id,
-    });
-    const updated = [newSess, ...current];
-    saveSessionsToStorage(updated);
-    setSessions(updated);
-
-    if (user?.id) {
-      supabase.from('user_sessions').insert([newSess]).catch((err) => {
-        console.error('Error saving session to Supabase:', err);
-      });
-    }
-
-    return newSess;
-  }, [user?.id]);
-
-  const deleteSession = useCallback((sessionId) => {
-    const current = loadSessionsFromStorage();
-    const updated = current.filter((s) => s.id !== sessionId);
-    saveSessionsToStorage(updated);
-    setSessions(updated);
-
-    if (user?.id) {
-      supabase.from('user_sessions').delete().eq('id', sessionId).eq('user_id', user.id).catch((err) => {
-        console.error('Error deleting session from Supabase:', err);
-      });
-    }
-  }, [user?.id]);
+  const data = useAppData();
 
   return {
-    sessions,
-    addSession,
-    deleteSession,
-    fetchUserData,
+    sessions: data.sessions || [],
+    addSession: data.addSession,
+    deleteSession: data.deleteSession,
+    fetchUserData: data.fetchUserData,
   };
 }
 
 // Compute Heatmap intensity and data for given number of days (default 60 days)
-export function calculateHeatmapData(sessions, days = 60) {
+export function calculateHeatmapData(sessions = [], days = 60) {
   const data = [];
   const today = new Date();
 
   // Create lookup dictionary: "YYYY-MM-DD" -> array of sessions
   const sessionsByDate = {};
-  sessions.forEach((s) => {
+  (sessions || []).forEach((s) => {
     const norm = normalizeSession(s);
     if (!sessionsByDate[norm.date]) {
       sessionsByDate[norm.date] = [];

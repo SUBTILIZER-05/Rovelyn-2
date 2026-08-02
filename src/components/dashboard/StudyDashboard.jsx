@@ -224,15 +224,6 @@ export function StudyDashboard({ onNavigate }) {
   // Consume dynamic chapter state from global ChapterContext
   const { chapters, getSubjectChapters, deleteChapter } = useChapters();
 
-  // Purge legacy local storage cache containing hardcoded chapters
-  useEffect(() => {
-    try {
-      localStorage.removeItem('rovelyn_subjects_data_v1');
-    } catch (e) {
-      console.error('Failed to clean legacy localStorage key:', e);
-    }
-  }, []);
-
   // Typewriter State & Animation Logic
   const [targetPhrase] = useState(() => GREETINGS[Math.floor(Math.random() * GREETINGS.length)]);
   const [displayedText, setDisplayedText] = useState('');

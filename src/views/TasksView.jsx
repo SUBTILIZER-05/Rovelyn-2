@@ -4,51 +4,12 @@ import { CheckSquare, Plus, CheckCircle2, Circle, Clock, Trash2 } from 'lucide-r
 import MagneticButton from '../components/ui/MagneticButton';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
+import { useAppData } from '../context/AppDataContext';
 
 export function TaskPlanner() {
   const auth = useAuth();
   const user = auth?.user ?? null;
-
-  // Purged default mock fallbacks - initialize with clean empty array
-  const [tasks, setTasks] = useState(() => {
-    try {
-      const saved = localStorage.getItem('rovelyn_tasks_v1');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error('Failed to load tasks from localStorage:', e);
-    }
-    return [];
-  });
-
-  // Fetch tasks from Supabase strictly scoped to user.id
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const fetchUserTasks = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('user_tasks')
-          .select('*')
-          .eq('user_id', user.id);
-
-        if (!error && data) {
-          setTasks(data); // Returns [] for new users
-        }
-      } catch (err) {
-        console.error('Supabase fetch tasks error:', err);
-      }
-    };
-
-    fetchUserTasks();
-  }, [user?.id]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('rovelyn_tasks_v1', JSON.stringify(tasks));
-    } catch (e) {
-      console.error('Failed to save tasks to localStorage:', e);
-    }
-  }, [tasks]);
+  const { tasks = [], setTasks, toggleTask, deleteTask } = useAppData();
 
   // Task Creation Form State
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -59,14 +20,6 @@ export function TaskPlanner() {
 
   // Filter State
   const [filterSubject, setFilterSubject] = useState('All');
-
-  const toggleTask = (id) => {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t)));
-  };
-
-  const deleteTask = (id) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id));
-  };
 
   const formatDueString = (dateVal, timeVal) => {
     if (!dateVal) return 'Today, 8:00 PM';
@@ -102,12 +55,6 @@ export function TaskPlanner() {
     };
 
     setTasks((prev) => [newTask, ...prev]);
-
-    if (user?.id) {
-      supabase.from('user_tasks').insert([newTask]).catch((err) => {
-        console.error('Error inserting task to Supabase:', err);
-      });
-    }
 
     setNewTaskTitle('');
     setNewDueDate('');

@@ -17,6 +17,7 @@ import {
 import MagneticButton from '../ui/MagneticButton';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
+import { useAppData } from '../../context/AppDataContext';
 
 function ThreeDTiltCard({ children, className = '' }) {
   const cardRef = useRef(null);
@@ -152,67 +153,8 @@ export function TestTracker() {
   const auth = useAuth();
   const user = auth?.user ?? null;
 
-  // Local Storage Persistence - Purged default mock fallbacks to enforce [] for new users
-  const [pastTests, setPastTests] = useState(() => {
-    try {
-      const saved = localStorage.getItem('rovelyn_past_tests_v1');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error('Failed to load past tests from localStorage:', e);
-    }
-    return [];
-  });
-
-  const [upcomingTests, setUpcomingTests] = useState(() => {
-    try {
-      const saved = localStorage.getItem('rovelyn_upcoming_tests_v1');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error('Failed to load upcoming tests from localStorage:', e);
-    }
-    return [];
-  });
-
-  // Fetch tests strictly scoped to user.id
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const fetchUserTests = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('user_tests')
-          .select('*')
-          .eq('user_id', user.id);
-
-        if (!error && data) {
-          const past = data.filter((t) => t.is_upcoming !== true);
-          const upcoming = data.filter((t) => t.is_upcoming === true);
-          setPastTests(past);
-          setUpcomingTests(upcoming);
-        }
-      } catch (err) {
-        console.error('Supabase fetch user_tests error:', err);
-      }
-    };
-
-    fetchUserTests();
-  }, [user?.id]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('rovelyn_past_tests_v1', JSON.stringify(pastTests));
-    } catch (e) {
-      console.error('Failed to save past tests to localStorage:', e);
-    }
-  }, [pastTests]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('rovelyn_upcoming_tests_v1', JSON.stringify(upcomingTests));
-    } catch (e) {
-      console.error('Failed to save upcoming tests to localStorage:', e);
-    }
-  }, [upcomingTests]);
+  // Global App State Persistence via Supabase user_data table
+  const { pastTests = [], setPastTests, upcomingTests = [], setUpcomingTests } = useAppData();
 
   // Chart Subject Filter State: 'Total' | 'Physics' | 'Chemistry' | 'Math'
   const [chartSubjectFilter, setChartSubjectFilter] = useState('Total');
