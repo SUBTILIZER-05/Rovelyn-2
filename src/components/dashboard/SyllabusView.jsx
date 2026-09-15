@@ -46,7 +46,7 @@ export function SyllabusView({
   const [isAddingSubtaskInline, setIsAddingSubtaskInline] = useState(false);
 
   // Selected chapter object
-  const selectedChapter = (cards || []).find((c) => c.id === selectedChapterId);
+  const selectedChapter = (cards || []).find((c) => String(c.id) === String(selectedChapterId));
 
   // Calculate subject overall progress
   const calculateOverallProgress = (chapters) => {
@@ -98,7 +98,7 @@ export function SyllabusView({
   const startEditingChapter = (ch, e) => {
     if (e) e.stopPropagation();
     setEditingChapterId(ch.id);
-    setEditingTitle(ch.title);
+    setEditingTitle(ch.title || ch.name || ch.chapterName || ch.chapter_name || '');
     setEditingModuleTotal(ch.moduleQuestions?.total || 0);
     setEditingModuleComp(ch.moduleQuestions?.completed || 0);
     setEditingWorkbookTotal(ch.workbookQuestions?.total || 0);
@@ -475,7 +475,7 @@ export function SyllabusView({
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-3">
                             <h4 className="text-base font-medium text-white truncate group-hover:text-indigo-200 transition-colors">
-                              {ch.title}
+                              {ch.title || ch.name || ch.chapterName || ch.chapter_name || 'Untitled'}
                             </h4>
                             <span className="text-[10px] font-mono text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded">
                               {cardProgress}%
@@ -551,7 +551,9 @@ export function SyllabusView({
                 </div>
               ) : (
                 <div className="flex items-center gap-3 mt-0.5">
-                  <h3 className="text-2xl font-light text-white font-sans">{selectedChapter.title}</h3>
+                  <h3 className="text-2xl font-light text-white font-sans">
+                    {selectedChapter ? (selectedChapter.title || selectedChapter.name || selectedChapter.chapterName || selectedChapter.chapter_name || 'Untitled') : 'Untitled'}
+                  </h3>
                   <button
                     onClick={(e) => startEditingChapter(selectedChapter, e)}
                     className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"

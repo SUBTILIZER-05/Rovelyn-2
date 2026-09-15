@@ -141,7 +141,9 @@ export function SyllabusModal({
                 return (
                   <div key={ch.id} className="p-4 rounded-2xl bg-white/[0.02] border border-white/10 flex items-center justify-between gap-4">
                     <div className="flex-1">
-                      <h4 className="text-sm text-white font-sans">{ch.title}</h4>
+                      <h4 className="text-sm text-white font-sans">
+                        {ch.title || ch.name || ch.chapterName || ch.chapter_name || 'Untitled'}
+                      </h4>
                       <p className="text-xs text-zinc-400 mt-0.5">
                         {subtasks.filter((s) => s.completed).length}/{subtasks.length} Subtasks
                       </p>

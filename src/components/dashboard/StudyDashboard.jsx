@@ -357,13 +357,15 @@ export function StudyDashboard({ onNavigate }) {
                   totalItems += (ch.moduleQuestions?.total || 0) + (ch.workbookQuestions?.total || 0);
                   completedItems += (ch.moduleQuestions?.completed || 0) + (ch.workbookQuestions?.completed || 0);
 
-                  if (!activeChapterName && ch.status === 'in_progress') {
-                    activeChapterName = ch.title;
+                  const chTitle = ch.title || ch.name || ch.chapterName || ch.chapter_name || ch.chapter;
+                  if (!activeChapterName && chTitle && (ch.status === 'in_progress' || ch.status === 'pending')) {
+                    activeChapterName = chTitle;
                   }
                 });
 
                 if (!activeChapterName && subj.chapters.length > 0) {
-                  activeChapterName = subj.chapters[0].title;
+                  const firstCh = subj.chapters[0];
+                  activeChapterName = firstCh.title || firstCh.name || firstCh.chapterName || firstCh.chapter_name || firstCh.chapter || 'Untitled';
                 }
 
                 const overallProgress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
