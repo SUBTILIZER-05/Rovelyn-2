@@ -42,14 +42,6 @@ export const AuthProvider = ({ children }) => {
     return await supabase.auth.signOut();
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#04040a] text-indigo-400 flex items-center justify-center font-mono text-xs">
-        INITIALIZING ROVELYN TELEMETRY...
-      </div>
-    );
-  }
-
   return (
     <AuthContext.Provider value={{ user, loading, signUp, signIn, signOut }}>
       {children}

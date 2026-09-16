@@ -7,6 +7,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { useChapters } from '../../context/ChapterContext';
+import { calculateSubjectProgress } from '../../lib/syllabusUtils';
 
 export function SyllabusModal({
   subject,
@@ -19,24 +20,7 @@ export function SyllabusModal({
   const chapters = getSubjectChapters(subject.title, subject.class_level || 'C-11');
 
   // Calculate subject overall progress
-  const calculateOverallProgress = (chList) => {
-    let totalSubtasks = 0;
-    let completedSubtasks = 0;
-    let totalQuestions = 0;
-    let completedQuestions = 0;
-
-    (chList || []).forEach((ch) => {
-      const subtasks = ch.subtasks || [];
-      totalSubtasks += subtasks.length;
-      completedSubtasks += subtasks.filter((s) => s.completed).length;
-      totalQuestions += (ch.moduleQuestions?.total || 0) + (ch.workbookQuestions?.total || 0);
-      completedQuestions += (ch.moduleQuestions?.completed || 0) + (ch.workbookQuestions?.completed || 0);
-    });
-
-    const totalItems = totalSubtasks + totalQuestions;
-    const completedItems = completedSubtasks + completedQuestions;
-    return totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
-  };
+  const overallProgress = calculateSubjectProgress(chapters);
 
   const handleDeleteChapter = async (chId, e) => {
     if (e) e.stopPropagation();
@@ -58,8 +42,6 @@ export function SyllabusModal({
 
     await updateChapter(chId, { status: nextStatus });
   };
-
-  const overallProgress = calculateOverallProgress(chapters);
 
   const renderStatusBadge = (status, onClick) => {
     let badgeStyle = "bg-zinc-800/80 text-zinc-400 border-white/5 hover:border-white/20";

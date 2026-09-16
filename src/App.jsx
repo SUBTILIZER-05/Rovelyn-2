@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, BookOpen, Timer, CheckSquare, FileText, X } from 'lucide-react';
 import {
@@ -16,15 +16,52 @@ import { FocusTimer } from './views/TimerView';
 import { TaskPlanner } from './views/TasksView';
 import { FloatingDock } from './components/ui/floating-dock';
 import { useAuth } from './context/AuthContext';
+import { useAppData } from './context/AppDataContext';
 import { AuthPortal } from './components/Auth/AuthPortal';
+import { useChapters } from './context/ChapterContext';
+import { BrandSplashScreen } from './components/ui/BrandSplashScreen';
 
 export function App() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { loading: appDataLoading } = useAppData();
+  const { chapters } = useChapters();
+  const [showSplash, setShowSplash] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [tests, setTests] = useState([]);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [navigationTarget, setNavigationTarget] = useState(null);
 
+  const isHydrated = !authLoading && (!user || !appDataLoading);
+
+  // Deep-navigation chapter click handler
+  const handleSelectChapter = (chapter) => {
+    if (!chapter) return;
+
+    const rawClass = chapter.classLevel || chapter.rawChapterData?.class_level || chapter.rawChapterData?.classLevel || '11';
+    const normClass = String(rawClass).includes('12') ? 'C-12' : 'C-11';
+    const normSubj = (chapter.subject || '').toLowerCase();
+
+    let subjectId = 'phy-11';
+    if (normSubj.includes('phys')) {
+      subjectId = normClass === 'C-12' ? 'phy-12' : 'phy-11';
+    } else if (normSubj.includes('chem')) {
+      subjectId = normClass === 'C-12' ? 'chem-12' : 'chem-11';
+    } else if (normSubj.includes('math')) {
+      subjectId = normClass === 'C-12' ? 'math-12' : 'math-11';
+    }
+
+    setNavigationTarget({
+      tab: 'dashboard',
+      classLevel: normClass,
+      subjectId: subjectId,
+      chapterId: String(chapter.id),
+      timestamp: Date.now(),
+    });
+
+    setActiveTab('dashboard');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   // Shortcut key handling (⌘K / Ctrl+K)
   useEffect(() => {
@@ -82,7 +119,7 @@ export function App() {
   const renderActiveTab = () => {
     switch (activeTab) {
       case "dashboard":
-        return <StudyDashboard tests={tests} onNavigate={handleTabChange} />;
+        return <StudyDashboard tests={tests} onNavigate={handleTabChange} navigationTarget={navigationTarget} />;
       case "tests":
         return <TestTracker tests={tests} setTests={setTests} />;
       case "analytics":
@@ -92,7 +129,7 @@ export function App() {
       case "tasks":
         return <TaskPlanner />;
       default:
-        return <StudyDashboard tests={tests} onNavigate={handleTabChange} />;
+        return <StudyDashboard tests={tests} onNavigate={handleTabChange} navigationTarget={navigationTarget} />;
     }
   };
 
@@ -113,29 +150,52 @@ export function App() {
     );
   });
 
-  // 1. Loading State Screen
-  if (loading) {
-    return (
-      <div className="min-h-screen w-full bg-[#04040a] flex items-center justify-center flex-col gap-4 font-mono text-slate-300 select-none">
-        <div className="relative w-12 h-12 flex items-center justify-center">
-          <div className="absolute inset-0 rounded-full border-2 border-indigo-500/20 border-t-indigo-500 animate-spin" />
-          <div className="w-2.5 h-2.5 rounded-full bg-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.8)] animate-pulse" />
-        </div>
-        <div className="flex flex-col items-center gap-1">
-          <span className="text-xs font-semibold tracking-[0.25em] uppercase text-indigo-300">ROVELYN OS</span>
-          <span className="text-[10px] tracking-wider text-slate-500">AUTHENTICATING TELEMETRY SESSION...</span>
-        </div>
-      </div>
-    );
-  }
+  const searchableChaptersInModal = useMemo(() => {
+    if (!Array.isArray(chapters) || !searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase().trim();
 
-  // 2. Unauthenticated Guard Screen
-  if (!user) {
-    return <AuthPortal />;
-  }
+    return chapters
+      .map((ch) => {
+        const title = ch.title || ch.name || ch.chapterName || ch.chapter_name || ch.chapter || '';
+        const name = typeof title === 'string' ? title.trim() : '';
+
+        if (!name || name.toLowerCase() === 'untitled chapter' || name.toLowerCase() === 'untitled') {
+          return null;
+        }
+
+        const rawClass = ch.class_level || ch.classLevel || 'C-11';
+        const classLevel = String(rawClass).includes('12') ? '12' : '11';
+        const subject = ch.subject || 'Physics';
+
+        return {
+          id: ch.id,
+          name: name,
+          subject: subject,
+          classLevel: classLevel,
+          rawChapterData: ch,
+        };
+      })
+      .filter(Boolean)
+      .filter((ch) => {
+        const nameMatch = ch.name.toLowerCase().includes(q);
+        const subjectMatch = ch.subject.toLowerCase().includes(q);
+        return nameMatch || subjectMatch;
+      });
+  }, [chapters, searchQuery]);
 
   return (
-    <div className="relative min-h-screen w-full bg-[#030308] text-slate-100 overflow-x-hidden antialiased selection:bg-purple-500/30">
+    <>
+      {showSplash && (
+        <BrandSplashScreen
+          isHydrated={isHydrated}
+          onFinish={() => setShowSplash(false)}
+        />
+      )}
+
+      {!authLoading && !user ? (
+        <AuthPortal />
+      ) : (
+        <div className="relative min-h-screen w-full bg-[#030308] text-slate-100 overflow-x-hidden antialiased selection:bg-purple-500/30">
       {/* PERSISTENT AMBIENT OBSIDIAN GLOW - DO NOT REMOVE */}
       <div 
         className="fixed inset-0 pointer-events-none z-0"
@@ -146,7 +206,10 @@ export function App() {
       />
 
       {/* Top Navigation Header */}
-      <Header onSearchClick={() => setIsCommandOpen(true)} />
+      <Header
+        onSearchClick={() => setIsCommandOpen(true)}
+        onSelectChapter={handleSelectChapter}
+      />
 
       {/* Main Workspace Area with Proper Top & Bottom Clearance */}
       <main className="relative z-10 w-full max-w-7xl mx-auto pt-6 sm:pt-8 pb-28 md:pb-32 px-4 sm:px-6">
@@ -222,9 +285,9 @@ export function App() {
                 <span className="text-[10px] uppercase text-zinc-500 px-2 font-mono tracking-widest block mb-1">
                   Active Modules
                 </span>
-                {filteredCommandItems.length === 0 ? (
+                {filteredCommandItems.length === 0 && searchableChaptersInModal.length === 0 ? (
                   <div className="p-4 text-center text-xs text-zinc-500 font-mono">
-                    No matching active modules found
+                    No matching items found
                   </div>
                 ) : (
                   filteredCommandItems.map((item) => {
@@ -248,12 +311,46 @@ export function App() {
                     );
                   })
                 )}
+
+                {searchableChaptersInModal.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-white/10 space-y-1">
+                    <span className="text-[10px] uppercase text-zinc-500 px-2 font-mono tracking-widest block mb-1">
+                      Chapters ({searchableChaptersInModal.length})
+                    </span>
+                    {searchableChaptersInModal.map((ch) => (
+                      <button
+                        key={ch.id}
+                        onClick={() => {
+                          handleSelectChapter(ch);
+                          setIsCommandOpen(false);
+                          setSearchQuery('');
+                        }}
+                        className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-white/[0.06] text-xs font-mono text-zinc-300 transition-colors text-left group cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <BookOpen className="w-4 h-4 text-indigo-400 shrink-0" />
+                          <span className="truncate">{ch.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                          <span className="text-[10px] text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded">
+                            {ch.subject}
+                          </span>
+                          <span className="text-[10px] text-zinc-400 bg-white/5 px-2 py-0.5 rounded border border-white/10">
+                            Class {ch.classLevel}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
     </div>
+  )}
+</>
   );
 }
 

@@ -11,6 +11,7 @@ import MagneticButton from '../ui/MagneticButton';
 import SyllabusView from './SyllabusView';
 import Heatmap from './Heatmap';
 import { useChapters } from '../../context/ChapterContext';
+import { calculateSubjectProgress } from '../../lib/syllabusUtils';
 
 const GREETINGS = [
   "What are we working on today?",
@@ -214,12 +215,26 @@ const orbitalCardVariants = {
   },
 };
 
-export function StudyDashboard({ onNavigate }) {
+export function StudyDashboard({ onNavigate, navigationTarget }) {
   const [activeClass, setActiveClass] = useState('C-11');
   const [hoveredDot, setHoveredDot] = useState(null);
 
   // Active Subject for Full-Page Syllabus Tab View
   const [activeSubjectId, setActiveSubjectId] = useState(null);
+  const [targetChapterId, setTargetChapterId] = useState(null);
+
+  // Handle deep navigation target from search autocomplete
+  useEffect(() => {
+    if (navigationTarget?.subjectId) {
+      if (navigationTarget.classLevel) {
+        setActiveClass(navigationTarget.classLevel);
+      }
+      setActiveSubjectId(navigationTarget.subjectId);
+      if (navigationTarget.chapterId) {
+        setTargetChapterId(navigationTarget.chapterId);
+      }
+    }
+  }, [navigationTarget]);
 
   // Consume dynamic chapter state from global ChapterContext
   const { chapters, getSubjectChapters, deleteChapter } = useChapters();
@@ -268,9 +283,13 @@ export function StudyDashboard({ onNavigate }) {
     return (
       <AnimatePresence mode="wait">
         <SyllabusView
-          key={activeSubject.id}
+          key={`${activeSubject.id}_${targetChapterId || 'list'}_${navigationTarget?.timestamp || ''}`}
           subject={activeSubject}
-          onBackToDashboard={() => setActiveSubjectId(null)}
+          initialChapterId={targetChapterId}
+          onBackToDashboard={() => {
+            setActiveSubjectId(null);
+            setTargetChapterId(null);
+          }}
         />
       </AnimatePresence>
     );
@@ -346,17 +365,9 @@ export function StudyDashboard({ onNavigate }) {
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 md:gap-8"
             >
               {currentSubjects.map((subj) => {
-                let totalItems = 0;
-                let completedItems = 0;
                 let activeChapterName = null;
 
                 subj.chapters.forEach((ch) => {
-                  const subtasks = ch.subtasks || [];
-                  totalItems += subtasks.length;
-                  completedItems += subtasks.filter((s) => s.completed).length;
-                  totalItems += (ch.moduleQuestions?.total || 0) + (ch.workbookQuestions?.total || 0);
-                  completedItems += (ch.moduleQuestions?.completed || 0) + (ch.workbookQuestions?.completed || 0);
-
                   const chTitle = ch.title || ch.name || ch.chapterName || ch.chapter_name || ch.chapter;
                   if (!activeChapterName && chTitle && (ch.status === 'in_progress' || ch.status === 'pending')) {
                     activeChapterName = chTitle;
@@ -368,7 +379,7 @@ export function StudyDashboard({ onNavigate }) {
                   activeChapterName = firstCh.title || firstCh.name || firstCh.chapterName || firstCh.chapter_name || firstCh.chapter || 'Untitled';
                 }
 
-                const overallProgress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+                const overallProgress = calculateSubjectProgress(subj.chapters);
                 const SubjectIcon = getSubjectIcon(subj.icon);
 
                 return (

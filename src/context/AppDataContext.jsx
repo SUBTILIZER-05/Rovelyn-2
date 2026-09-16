@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from './AuthContext';
+import { ensureCoreSubtasks, DEFAULT_SUBTASKS } from '../lib/syllabusUtils';
 
 const AppDataContext = createContext({});
 
@@ -99,12 +100,7 @@ const normalizeChapterObj = (ch, userId, fallbackClassLevel) => {
     chapterName: ch.chapterName || title,
     chapter_name: ch.chapter_name || title,
     status: ch.status || 'pending',
-    subtasks: Array.isArray(ch.subtasks)
-      ? ch.subtasks
-      : [
-          { id: 'sub_1', title: 'Read Theory & Notes', completed: false },
-          { id: 'sub_2', title: 'Solve Example Problems', completed: false },
-        ],
+    subtasks: ensureCoreSubtasks(ch.subtasks),
     moduleQuestions: ch.moduleQuestions || ch.module_questions || { total: 50, completed: 0 },
     workbookQuestions: ch.workbookQuestions || ch.workbook_questions || { total: 30, completed: 0 },
     class_level: classLvl,
@@ -375,10 +371,7 @@ export const AppDataProvider = ({ children }) => {
       title: newChapterTitle,
       subject: selectedSubject,
       status: status || 'pending',
-      subtasks: [
-        { id: 'sub_1', title: 'Read Theory & Notes', completed: false },
-        { id: 'sub_2', title: 'Solve Example Problems', completed: false },
-      ],
+      subtasks: DEFAULT_SUBTASKS.map((st) => ({ ...st })),
       moduleQuestions: { total: 50, completed: 0 },
       workbookQuestions: { total: 30, completed: 0 },
       class_level: classLevel,
