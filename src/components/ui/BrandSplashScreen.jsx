@@ -1,40 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
-export function BrandSplashScreen({ isHydrated = true, onFinish }) {
-  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+export function BrandSplashScreen({ onFinish }) {
   const [isExiting, setIsExiting] = useState(false);
 
   useEffect(() => {
     // Lock viewport scroll while curtain splash is active
     document.body.style.overflow = 'hidden';
 
-    // 3.2-second total brand reveal sequence duration
-    const timer = setTimeout(() => {
-      setMinTimeElapsed(true);
+    // Start 600ms fade-out transition at 2.6s
+    const exitTimer = setTimeout(() => {
+      setIsExiting(true);
+      document.body.style.overflow = 'unset';
+    }, 2600);
+
+    // Complete exit sequence and trigger unmount at 3.2s
+    const finishTimer = setTimeout(() => {
+      document.body.style.overflow = 'unset';
+      if (onFinish) onFinish();
     }, 3200);
 
     return () => {
-      document.body.style.overflow = '';
-      clearTimeout(timer);
+      document.body.style.overflow = 'unset';
+      clearTimeout(exitTimer);
+      clearTimeout(finishTimer);
     };
-  }, []);
-
-  useEffect(() => {
-    // Transition out curtain when BOTH the 3.2s motion sequence AND background store hydration conclude
-    if (minTimeElapsed && isHydrated && !isExiting) {
-      setIsExiting(true);
-      const exitTimer = setTimeout(() => {
-        if (onFinish) onFinish();
-      }, 600); // 600ms smooth backdrop fade-out
-      return () => clearTimeout(exitTimer);
-    }
-  }, [minTimeElapsed, isHydrated, isExiting, onFinish]);
+  }, [onFinish]);
 
   return (
     <div
-      className={`fixed inset-0 w-screen h-screen z-[9999] bg-[#050609] flex items-center justify-center select-none overflow-hidden pointer-events-auto transition-opacity duration-600 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-        isExiting ? 'opacity-0 pointer-events-none' : 'opacity-100'
+      className={`fixed inset-0 w-screen h-screen z-[9999] bg-[#050609] flex items-center justify-center select-none overflow-hidden transition-opacity duration-600 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        isExiting ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
       }`}
     >
       {/* Ambient Violet/Indigo Radial Flare (Phase 1 Entrance -> Phase 2 Bloom) */}
@@ -53,7 +49,7 @@ export function BrandSplashScreen({ isHydrated = true, onFinish }) {
       />
 
       {/* Main Brand Typography Container */}
-      <div className="relative z-10 flex items-center justify-center pl-[0.45em]">
+      <div className="relative z-10 flex items-center justify-center pl-[0.45em] pointer-events-none">
         <motion.div
           initial={{ opacity: 0, filter: 'blur(12px)', letterSpacing: '0.7em', scale: 0.96 }}
           animate={{
@@ -67,7 +63,7 @@ export function BrandSplashScreen({ isHydrated = true, onFinish }) {
             times: [0, 0.3125, 0.75, 1], // Phase 1: 0-1.0s Entrance, Phase 2: 1.0-2.4s Shimmer, Phase 3: 2.4-3.2s Dissolve
             ease: [0.16, 1, 0.3, 1],
           }}
-          className="relative font-sans font-bold text-4xl sm:text-6xl uppercase tracking-[0.45em] select-none flex items-center justify-center"
+          className="relative font-sans font-bold text-4xl sm:text-6xl uppercase tracking-[0.45em] select-none flex items-center justify-center pointer-events-none"
         >
           {/* Brand Name with Accented Trailing N */}
           <span className="bg-gradient-to-b from-white via-neutral-100 to-neutral-400 bg-clip-text text-transparent drop-shadow-[0_0_35px_rgba(255,255,255,0.12)]">

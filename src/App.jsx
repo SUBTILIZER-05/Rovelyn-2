@@ -187,7 +187,6 @@ export function App() {
     <>
       {showSplash && (
         <BrandSplashScreen
-          isHydrated={isHydrated}
           onFinish={() => setShowSplash(false)}
         />
       )}
