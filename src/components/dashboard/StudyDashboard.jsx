@@ -1,16 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Atom,
   FlaskConical,
   Compass,
-  ArrowRight
+  ArrowRight,
+  CheckCircle2,
+  Clock
 } from 'lucide-react';
 import GlareCard from '../ui/GlareCard';
 import MagneticButton from '../ui/MagneticButton';
 import SyllabusView from './SyllabusView';
 import Heatmap from './Heatmap';
 import { useChapters } from '../../context/ChapterContext';
+import { useAppData } from '../../context/AppDataContext';
 import { calculateSubjectProgress } from '../../lib/syllabusUtils';
 
 const GREETINGS = [
@@ -236,8 +239,21 @@ export function StudyDashboard({ onNavigate, navigationTarget }) {
     }
   }, [navigationTarget]);
 
-  // Consume dynamic chapter state from global ChapterContext
+  // Consume dynamic chapter state from global ChapterContext and task state from AppDataContext
   const { chapters, getSubjectChapters, deleteChapter } = useChapters();
+  const { tasks = [], toggleTask } = useAppData();
+
+  const highPriorityTasks = useMemo(() => {
+    return (tasks || [])
+      .filter(
+        (t) =>
+          t &&
+          !t.completed &&
+          t.priority &&
+          String(t.priority).toLowerCase() === 'high'
+      )
+      .slice(0, 4);
+  }, [tasks]);
 
   // Typewriter State & Animation Logic
   const [targetPhrase] = useState(() => GREETINGS[Math.floor(Math.random() * GREETINGS.length)]);
@@ -334,8 +350,71 @@ export function StudyDashboard({ onNavigate, navigationTarget }) {
         </div>
       </div>
 
-      {/* 2. Floating Natural Reactive Heatmap Matrix Grid */}
-      <Heatmap days={60} title="60-Day Focus Matrix" />
+      {/* 2. Dedicated High Priority Tasks Shelf */}
+      <div className="bg-neutral-900/40 border border-white/[0.07] backdrop-blur-md rounded-2xl p-4 sm:p-5 space-y-3 font-mono">
+        <div className="flex items-center justify-between pb-1 border-b border-white/[0.05]">
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)] animate-pulse" />
+            <span className="text-[11px] font-mono tracking-[0.2em] text-neutral-400 uppercase">
+              HIGH PRIORITY TARGETS
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => onNavigate && onNavigate('tasks')}
+            className="text-xs font-mono text-neutral-400 hover:text-white transition-colors flex items-center gap-1 cursor-pointer"
+          >
+            <span>View All Tasks</span>
+            <ArrowRight className="w-3.5 h-3.5 text-neutral-500" />
+          </button>
+        </div>
+
+        {highPriorityTasks.length === 0 ? (
+          <div className="flex items-center gap-2 text-xs font-mono text-neutral-400 py-2 px-1">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 stroke-[1.5] shrink-0" />
+            <span>No high-priority targets remaining · Clear runway ahead</span>
+          </div>
+        ) : (
+          <div className="space-y-1.5 font-sans">
+            {highPriorityTasks.map((t) => (
+              <div
+                key={t.id}
+                onClick={() => onNavigate && onNavigate('tasks')}
+                className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl hover:bg-white/[0.02] border border-transparent hover:border-white/[0.05] transition-all group cursor-pointer select-none"
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleTask(t.id);
+                    }}
+                    className="w-4 h-4 rounded-full border border-rose-500/50 hover:border-rose-400 hover:bg-rose-500/10 transition-colors flex items-center justify-center cursor-pointer shrink-0"
+                    title="Mark task as complete"
+                  />
+                  <span className="text-sm font-medium text-neutral-200 tracking-tight truncate">
+                    {t.title || t.text || 'Untitled Task'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {t.subject && (
+                    <span className="bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[10px] font-mono px-2 py-0.5 rounded-md">
+                      {t.subject}
+                    </span>
+                  )}
+                  {t.due && (
+                    <span className="text-[10px] font-mono text-neutral-400 flex items-center gap-1 bg-white/[0.03] border border-white/[0.06] px-2 py-0.5 rounded-md">
+                      <Clock className="w-3 h-3 text-neutral-500" />
+                      <span>{t.due}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* 3. Luminescent Subject Modules Bento Grid */}
       <div className="space-y-6 flex-1 flex flex-col justify-center">
@@ -409,6 +488,9 @@ export function StudyDashboard({ onNavigate, navigationTarget }) {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* 4. Floating Natural Reactive Heatmap Matrix Grid (Relocated Below Glare Cards) */}
+      <Heatmap days={60} title="60-Day Focus Matrix" />
     </div>
   </div>
 );
