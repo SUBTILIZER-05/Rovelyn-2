@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, BookOpen, Timer, CheckSquare, FileText, X } from 'lucide-react';
 import {
@@ -20,11 +20,13 @@ import { useAppData } from './context/AppDataContext';
 import { AuthPortal } from './components/Auth/AuthPortal';
 import { useChapters } from './context/ChapterContext';
 import { BrandSplashScreen } from './components/ui/BrandSplashScreen';
+import { useTimer } from './context/TimerContext';
 
 export function App() {
   const { user, loading: authLoading } = useAuth();
   const { loading: appDataLoading } = useAppData();
   const { chapters } = useChapters();
+  const { isRunning: isTimerRunning, currentSeconds, formatTime: formatTimerTime } = useTimer();
   const [showSplash, setShowSplash] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [tests, setTests] = useState([]);
@@ -83,38 +85,48 @@ export function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const formattedTimer = formatTimerTime(currentSeconds);
+
   const navItems = [
     {
       id: "dashboard",
       title: "Dashboard",
       icon: <IconHome className="h-full w-full text-slate-300" />,
+      isActive: activeTab === "dashboard",
       onClick: () => setActiveTab("dashboard")
     },
     {
       id: "tests",
       title: "Test Tracker",
       icon: <IconClipboardList className="h-full w-full text-slate-300" />,
+      isActive: activeTab === "tests",
       onClick: () => setActiveTab("tests")
     },
     {
       id: "analytics",
       title: "Analytics & Stats",
       icon: <IconChartDots className="h-full w-full text-slate-300" />,
+      isActive: activeTab === "analytics",
       onClick: () => setActiveTab("analytics")
     },
     {
       id: "timer",
-      title: "Focus Session",
-      icon: <IconClock className="h-full w-full text-slate-300" />,
+      title: isTimerRunning ? `Focus Active (${formattedTimer})` : "Focus Session",
+      icon: <IconClock className={`h-full w-full ${isTimerRunning ? 'text-indigo-400 animate-pulse' : 'text-slate-300'}`} />,
+      badge: isTimerRunning ? formattedTimer : null,
+      isRunning: isTimerRunning,
+      isActive: activeTab === "timer",
       onClick: () => setActiveTab("timer")
     },
     {
       id: "tasks",
       title: "Daily Tasks",
       icon: <IconChecklist className="h-full w-full text-slate-300" />,
+      isActive: activeTab === "tasks",
       onClick: () => setActiveTab("tasks")
     }
   ];
+
 
   const renderActiveTab = () => {
     switch (activeTab) {
@@ -183,13 +195,18 @@ export function App() {
       });
   }, [chapters, searchQuery]);
 
+  const handleFinishSplash = useCallback(() => {
+    setShowSplash(false);
+  }, []);
+
   return (
     <>
       {showSplash && (
         <BrandSplashScreen
-          onFinish={() => setShowSplash(false)}
+          onFinish={handleFinishSplash}
         />
       )}
+
 
       {!authLoading && !user ? (
         <AuthPortal />

@@ -1,36 +1,49 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 
 export function BrandSplashScreen({ onFinish }) {
-  const [isExiting, setIsExiting] = useState(false);
+  const [isSplashVisible, setIsSplashVisible] = useState(true);
+  const [isFadingOut, setIsFadingOut] = useState(false);
+
+  const onFinishRef = useRef(onFinish);
+  useEffect(() => {
+    onFinishRef.current = onFinish;
+  }, [onFinish]);
 
   useEffect(() => {
     // Lock viewport scroll while curtain splash is active
     document.body.style.overflow = 'hidden';
 
-    // Start 600ms fade-out transition at 2.6s
-    const exitTimer = setTimeout(() => {
-      setIsExiting(true);
+    // Start 600ms fade-out transition after 2.8 seconds
+    const fadeTimer = setTimeout(() => {
+      setIsFadingOut(true);
       document.body.style.overflow = 'unset';
-    }, 2600);
+    }, 2800);
 
-    // Complete exit sequence and trigger unmount at 3.2s
-    const finishTimer = setTimeout(() => {
+    // Completely unmount from DOM after fade completes (3.4s)
+    const removeTimer = setTimeout(() => {
+      setIsSplashVisible(false);
       document.body.style.overflow = 'unset';
-      if (onFinish) onFinish();
-    }, 3200);
+      if (onFinishRef.current) {
+        onFinishRef.current();
+      }
+    }, 3400);
 
     return () => {
       document.body.style.overflow = 'unset';
-      clearTimeout(exitTimer);
-      clearTimeout(finishTimer);
+      clearTimeout(fadeTimer);
+      clearTimeout(removeTimer);
     };
-  }, [onFinish]);
+  }, []); // Bulletproof empty dependency array ensures timer runs unconditionally once on mount
+
+  if (!isSplashVisible) {
+    return null;
+  }
 
   return (
     <div
-      className={`fixed inset-0 w-screen h-screen z-[9999] bg-[#050609] flex items-center justify-center select-none overflow-hidden transition-opacity duration-600 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-        isExiting ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
+      className={`fixed inset-0 w-screen h-screen z-[9999] bg-[#050609] flex items-center justify-center select-none overflow-hidden transition-opacity duration-600 ease-out ${
+        isFadingOut ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
       }`}
     >
       {/* Ambient Violet/Indigo Radial Flare (Phase 1 Entrance -> Phase 2 Bloom) */}
@@ -41,8 +54,8 @@ export function BrandSplashScreen({ onFinish }) {
           scale: [0.75, 1, 1.05, 1.15],
         }}
         transition={{
-          duration: 3.2,
-          times: [0, 0.3125, 0.75, 1], // 0.0s -> 1.0s -> 2.4s -> 3.2s
+          duration: 3.4,
+          times: [0, 0.3125, 0.75, 1],
           ease: [0.16, 1, 0.3, 1],
         }}
         className="absolute w-[520px] h-[520px] rounded-full bg-gradient-to-tr from-indigo-600/15 via-purple-500/10 to-transparent blur-[140px] pointer-events-none"
@@ -59,8 +72,8 @@ export function BrandSplashScreen({ onFinish }) {
             scale: [0.96, 1, 1.01, 1.03],
           }}
           transition={{
-            duration: 3.2,
-            times: [0, 0.3125, 0.75, 1], // Phase 1: 0-1.0s Entrance, Phase 2: 1.0-2.4s Shimmer, Phase 3: 2.4-3.2s Dissolve
+            duration: 3.4,
+            times: [0, 0.3125, 0.75, 1],
             ease: [0.16, 1, 0.3, 1],
           }}
           className="relative font-sans font-bold text-4xl sm:text-6xl uppercase tracking-[0.45em] select-none flex items-center justify-center pointer-events-none"
@@ -82,7 +95,7 @@ export function BrandSplashScreen({ onFinish }) {
             }}
             transition={{
               duration: 1.4,
-              delay: 1.0, // Triggers smoothly during Phase 2 (1.0s – 2.4s)
+              delay: 1.0,
               ease: [0.16, 1, 0.3, 1],
             }}
             className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-[-25deg] pointer-events-none mix-blend-overlay"

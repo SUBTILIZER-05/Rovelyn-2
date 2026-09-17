@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import {
   Play,
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import MagneticButton from '../components/ui/MagneticButton';
 import { useStudySessions } from '../lib/useStudySessions';
+import { useTimer } from '../context/TimerContext';
 
 const SUBJECT_OPTIONS = [
   { id: 'Physics', label: 'Physics', color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30' },
@@ -23,22 +24,30 @@ const SUBJECT_OPTIONS = [
 ];
 
 export function FocusTimer() {
-  // Mode: 'stopwatch' | 'countdown'
-  const [activeMode, setActiveMode] = useState('countdown');
-
-  // Timer State
-  const [targetMinutes, setTargetMinutes] = useState(25);
-  const [customInputHrs, setCustomInputHrs] = useState('0');
-  const [customInputMins, setCustomInputMins] = useState('25');
-  const [secondsElapsed, setSecondsElapsed] = useState(0); // for stopwatch
-  const [secondsLeft, setSecondsLeft] = useState(25 * 60); // for countdown
-  const [isRunning, setIsRunning] = useState(false);
-
-  // Subject Selector State
-  const [selectedSubject, setSelectedSubject] = useState('Physics');
+  // Global Timer Store Context
+  const {
+    activeMode,
+    switchMode,
+    targetMinutes,
+    customInputHrs,
+    setCustomInputHrs,
+    customInputMins,
+    setCustomInputMins,
+    secondsElapsed,
+    secondsLeft,
+    isRunning,
+    selectedSubject,
+    setSelectedSubject,
+    toggleTimer,
+    resetTimer,
+    applyCustomTime,
+    handlePresetClick,
+    logSession,
+    formatTime,
+  } = useTimer();
 
   // Centralized Session History Hook
-  const { sessions, addSession, deleteSession } = useStudySessions();
+  const { sessions, deleteSession } = useStudySessions();
 
   // 3D Physics Card Mouse Movement Logic
   const containerRef = useRef(null);
@@ -69,131 +78,8 @@ export function FocusTimer() {
     y.set(0);
   };
 
-  // Timer Tick Logic
-  useEffect(() => {
-    let interval = null;
-    if (isRunning) {
-      interval = setInterval(() => {
-        if (activeMode === 'stopwatch') {
-          setSecondsElapsed((prev) => prev + 1);
-        } else {
-          setSecondsLeft((prev) => {
-            if (prev <= 1) {
-              setIsRunning(false);
-              handleLogSession(targetMinutes * 60, 'Countdown Timer');
-              return 0;
-            }
-            return prev - 1;
-          });
-        }
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [isRunning, activeMode, targetMinutes]);
-
-  // Switch Mode
-  const handleSwitchMode = (mode) => {
-    setActiveMode(mode);
-    setIsRunning(false);
-    if (mode === 'stopwatch') {
-      setSecondsElapsed(0);
-    } else {
-      setSecondsLeft(targetMinutes * 60);
-    }
-  };
-
-  // Dual Custom Time Input Handler (Hours + Minutes)
-  const handleApplyCustomTime = (hrsVal, minsVal) => {
-    const parsedHrs = Math.max(0, parseInt(hrsVal, 10) || 0);
-    const parsedMins = Math.max(0, parseInt(minsVal, 10) || 0);
-    const totalMins = parsedHrs * 60 + parsedMins;
-    const finalMins = Math.max(1, totalMins);
-
-    setTargetMinutes(finalMins);
-    setIsRunning(false);
-    setSecondsLeft(finalMins * 60);
-  };
-
-  // Preset Pills Click Handler
-  const handlePresetClick = (hrs, mins) => {
-    setCustomInputHrs(String(hrs));
-    setCustomInputMins(String(mins));
-    handleApplyCustomTime(hrs, mins);
-  };
-
-  const toggleTimer = () => setIsRunning((prev) => !prev);
-
-  const resetTimer = () => {
-    setIsRunning(false);
-    if (activeMode === 'stopwatch') {
-      setSecondsElapsed(0);
-    } else {
-      setSecondsLeft(targetMinutes * 60);
-    }
-  };
-
-  // Log completed session
-  const handleLogSession = (elapsedSecsOverride, modeName) => {
-    const elapsedSecs =
-      elapsedSecsOverride !== undefined
-        ? elapsedSecsOverride
-        : activeMode === 'stopwatch'
-        ? secondsElapsed
-        : targetMinutes * 60 - secondsLeft;
-
-    if (elapsedSecs < 5) {
-      // Avoid logging zero/accidental sessions
-      return;
-    }
-
-    const now = new Date();
-    const formattedDate = now.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    });
-    const formattedTime = now.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-
-    const minsDecimal = elapsedSecs / 60;
-    const durationMinutes = Math.max(1, Math.round(minsDecimal));
-    const durationText =
-      minsDecimal >= 60
-        ? `${(minsDecimal / 60).toFixed(1)} hrs`
-        : `${durationMinutes} mins`;
-
-    const isoDate = now.toISOString().split('T')[0];
-
-    addSession({
-      id: 'sess_' + now.getTime(),
-      subject: selectedSubject,
-      durationSeconds: elapsedSecs,
-      durationMinutes,
-      durationText,
-      mode: modeName || (activeMode === 'stopwatch' ? 'Stopwatch' : 'Countdown Timer'),
-      date: isoDate, // "YYYY-MM-DD"
-      formattedDate: `${formattedDate}, ${formattedTime}`,
-      timestamp: now.getTime(),
-    });
-
-    resetTimer();
-  };
-
   const handleDeleteSession = (sessionId) => {
     deleteSession(sessionId);
-  };
-
-  // Format Time Display (HH:MM:SS or MM:SS)
-  const formatTime = (totalSeconds) => {
-    const hrs = Math.floor(totalSeconds / 3600);
-    const mins = Math.floor((totalSeconds % 3600) / 60);
-    const secs = totalSeconds % 60;
-
-    if (hrs > 0) {
-      return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   const currentSeconds = activeMode === 'stopwatch' ? secondsElapsed : secondsLeft;
@@ -219,7 +105,7 @@ export function FocusTimer() {
           return (
             <button
               key={m.id}
-              onClick={() => handleSwitchMode(m.id)}
+              onClick={() => switchMode(m.id)}
               className={`relative flex-1 px-5 py-2.5 text-xs font-medium rounded-full flex items-center justify-center gap-2 transition-colors cursor-pointer z-10 ${
                 isActive ? 'text-white font-semibold' : 'text-slate-400 hover:text-slate-200'
               }`}
@@ -278,7 +164,7 @@ export function FocusTimer() {
                 value={customInputHrs}
                 onChange={(e) => {
                   setCustomInputHrs(e.target.value);
-                  handleApplyCustomTime(e.target.value, customInputMins);
+                  applyCustomTime(e.target.value, customInputMins);
                 }}
                 className="bg-white/5 border border-white/10 rounded-lg text-slate-100 text-center w-9 py-0.5 text-xs font-mono font-semibold focus:outline-none focus:border-indigo-400/50"
               />
@@ -293,7 +179,7 @@ export function FocusTimer() {
                 value={customInputMins}
                 onChange={(e) => {
                   setCustomInputMins(e.target.value);
-                  handleApplyCustomTime(customInputHrs, e.target.value);
+                  applyCustomTime(customInputHrs, e.target.value);
                 }}
                 className="bg-white/5 border border-white/10 rounded-lg text-slate-100 text-center w-9 py-0.5 text-xs font-mono font-semibold focus:outline-none focus:border-indigo-400/50"
               />
@@ -390,7 +276,7 @@ export function FocusTimer() {
         </MagneticButton>
 
         {/* LOG SESSION BUTTON */}
-        <MagneticButton strength={0.25} onClick={() => handleLogSession()}>
+        <MagneticButton strength={0.25} onClick={() => logSession()}>
           <button
             className="h-12 px-6 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 active:scale-95 text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer font-mono"
             title="Log current study session to history & analytics"

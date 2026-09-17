@@ -1,15 +1,19 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { IconSearch, IconLogout } from '@tabler/icons-react';
-import { CheckCircle2, Clock, BookOpen, X } from 'lucide-react';
+import { CheckCircle2, Clock, BookOpen, X, WifiOff, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import MagneticButton from './ui/MagneticButton';
 import { useAuth } from '../context/AuthContext';
 import { useChapters } from '../context/ChapterContext';
+import { useTimer } from '../context/TimerContext';
+import { useAppData } from '../context/AppDataContext';
 import { calculateChapterProgress } from '../lib/syllabusUtils';
 
 export function Header({ onSearchClick, onSelectChapter }) {
   const { user, signOut } = useAuth();
   const { chapters } = useChapters();
+  const { syncStatus, pendingSyncCount, isOnline, flushSync } = useAppData();
+
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -118,6 +122,8 @@ export function Header({ onSearchClick, onSelectChapter }) {
       if (inputRef.current) inputRef.current.blur();
     }
   };
+
+  const { isRunning: isTimerRunning, currentSeconds, formatTime: formatTimerTime, selectedSubject } = useTimer();
 
   const userEmail = user?.email || 'student@rovelyn.os';
   const initial = userEmail ? userEmail.charAt(0).toUpperCase() : 'R';
@@ -265,9 +271,47 @@ export function Header({ onSearchClick, onSelectChapter }) {
           </div>
         </div>
 
-        {/* Right: User Profile Avatar & Dropdown Menu */}
-        <div className="flex items-center justify-end relative" ref={menuRef}>
+        {/* Right: User Profile Avatar, Active Session & Sync Status Indicator */}
+        <div className="flex items-center justify-end relative gap-2 sm:gap-3" ref={menuRef}>
+          {/* Offline / Syncing Status Indicator Pill */}
+          {!isOnline || syncStatus === 'offline' ? (
+            <button
+              type="button"
+              onClick={flushSync}
+              className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-300 px-2.5 py-1 rounded-full text-[11px] font-mono cursor-pointer hover:bg-amber-500/20 transition-colors shadow-sm"
+              title="Offline · Changes saved locally. Click to retry sync."
+            >
+              <WifiOff className="w-3 h-3 text-amber-400 shrink-0" />
+              <span className="hidden sm:inline font-medium">Offline</span>
+              {pendingSyncCount > 0 && (
+                <span className="bg-amber-500/30 text-amber-200 px-1.5 py-0.2 rounded-full text-[9px] font-bold">
+                  {pendingSyncCount}
+                </span>
+              )}
+            </button>
+          ) : syncStatus === 'syncing' || pendingSyncCount > 0 ? (
+            <div
+              className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 px-2.5 py-1 rounded-full text-[11px] font-mono transition-colors shadow-sm"
+              title="Syncing pending changes with cloud..."
+            >
+              <RefreshCw className="w-3 h-3 text-indigo-400 animate-spin shrink-0" />
+              <span className="hidden sm:inline font-medium">Syncing</span>
+            </div>
+          ) : null}
+
+          {isTimerRunning && (
+            <div className="flex items-center gap-2 font-mono">
+              <div className="flex items-center gap-2 bg-indigo-600/20 border border-indigo-500/40 text-indigo-300 px-3 py-1 rounded-full text-xs font-semibold shadow-[0_0_12px_rgba(99,102,241,0.3)]">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="tabular-nums">{formatTimerTime(currentSeconds)}</span>
+                <span className="hidden md:inline text-[10px] text-indigo-300/70 border-l border-indigo-500/30 pl-2">{selectedSubject}</span>
+              </div>
+            </div>
+          )}
+
           <MagneticButton strength={0.25}>
+
+
             <button
               type="button"
               onClick={() => setIsMenuOpen(!isMenuOpen)}

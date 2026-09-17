@@ -2,6 +2,13 @@ import React, { createContext, useContext, useEffect, useState, useRef, useCallb
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from './AuthContext';
 import { ensureCoreSubtasks, DEFAULT_SUBTASKS } from '../lib/syllabusUtils';
+import {
+  subscribeSyncStatus,
+  flushSyncQueue,
+  enqueueMutation,
+  getIsOnline,
+} from '../lib/syncManager';
+
 
 const AppDataContext = createContext({});
 
@@ -298,7 +305,30 @@ export const AppDataProvider = ({ children }) => {
     fetchUserData();
   }, [fetchUserData]);
 
-  // Debounced auto-sync to Supabase `user_data` table whenever `appData` changes
+  const [syncState, setSyncState] = useState({
+    status: getIsOnline() ? 'online' : 'offline',
+    isOnline: getIsOnline(),
+    pendingCount: 0,
+    isFlushing: false,
+  });
+
+  // Subscribe to offline/online sync status and flush queue on reconnection
+  useEffect(() => {
+    const unsubscribe = subscribeSyncStatus((info) => {
+      setSyncState(info);
+      if (info.isOnline && info.pendingCount > 0 && user?.id) {
+        flushSyncQueue(supabase);
+      }
+    });
+
+    if (getIsOnline() && user?.id) {
+      flushSyncQueue(supabase);
+    }
+
+    return unsubscribe;
+  }, [user?.id]);
+
+  // Debounced auto-sync with local persistence & offline queue fallback
   useEffect(() => {
     // STRICT AUTO-SAVE GUARD: Do NOT trigger upsert if fetch in progress, session unresolved, or initial load incomplete
     if (!user?.id || !isInitialLoaded.current || loading) return;
@@ -307,39 +337,46 @@ export const AppDataProvider = ({ children }) => {
       clearTimeout(debounceTimer.current);
     }
 
-    // Mirror current state to localStorage immediately
+    // Mirror current state to localStorage immediately (Optimistic Local Execution)
     saveToLocalStorage(appData, user.id);
 
     debounceTimer.current = setTimeout(async () => {
       // Additional guard check before initiating remote upsert
       if (!user?.id || !isInitialLoaded.current) return;
 
+      const v4_data = buildV4Data(appData.chapters);
+
+      const payload = {
+        user_id: user.id,
+        content: {
+          tasks: appData.tasks,
+          upcoming_tests: appData.upcomingTests,
+          past_tests: appData.pastTests,
+          v4_data: v4_data,
+          chapters: appData.chapters,
+          sessions: appData.sessions,
+        },
+        updated_at: new Date().toISOString(),
+      };
+
+      if (!getIsOnline()) {
+        enqueueMutation('user_data', 'UPSERT', payload);
+        return;
+      }
+
       try {
         isSyncing.current = true;
-        const v4_data = buildV4Data(appData.chapters);
-
-        const payload = {
-          user_id: user.id,
-          content: {
-            tasks: appData.tasks,
-            upcoming_tests: appData.upcomingTests,
-            past_tests: appData.pastTests,
-            v4_data: v4_data,
-            chapters: appData.chapters,
-            sessions: appData.sessions,
-          },
-          updated_at: new Date().toISOString(),
-        };
-
         const { error } = await supabase
           .from('user_data')
           .upsert(payload, { onConflict: 'user_id' });
 
         if (error) {
-          console.error('Supabase user_data sync error:', error);
+          console.warn('Supabase user_data sync notice (enqueueing to offline queue):', error.message || error);
+          enqueueMutation('user_data', 'UPSERT', payload);
         }
       } catch (err) {
-        console.error('Failed to sync user_data to Supabase:', err);
+        console.warn('Network exception during user_data sync (enqueueing to offline queue):', err);
+        enqueueMutation('user_data', 'UPSERT', payload);
       } finally {
         isSyncing.current = false;
       }
@@ -351,6 +388,7 @@ export const AppDataProvider = ({ children }) => {
       }
     };
   }, [appData, user?.id, loading]);
+
 
   // --- CHAPTER ACTIONS ---
   const setChapters = useCallback((updater) => {
@@ -495,6 +533,12 @@ export const AppDataProvider = ({ children }) => {
         appData,
         loading,
         fetchUserData,
+        // Sync & Offline State
+        syncStatus: syncState.status,
+        isOnline: syncState.isOnline,
+        pendingSyncCount: syncState.pendingCount,
+        isSyncing: syncState.isFlushing,
+        flushSync: () => flushSyncQueue(supabase),
         // Chapters
         chapters: appData.chapters,
         setChapters,
@@ -520,6 +564,7 @@ export const AppDataProvider = ({ children }) => {
         deleteTask,
       }}
     >
+
       {children}
     </AppDataContext.Provider>
   );
