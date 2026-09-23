@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { IconSearch, IconLogout } from '@tabler/icons-react';
-import { CheckCircle2, Clock, BookOpen, X, WifiOff, RefreshCw } from 'lucide-react';
+import { CheckCircle2, Clock, BookOpen, X, WifiOff, RefreshCw, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import MagneticButton from './ui/MagneticButton';
 import { useAuth } from '../context/AuthContext';
@@ -8,6 +8,77 @@ import { useChapters } from '../context/ChapterContext';
 import { useTimer } from '../context/TimerContext';
 import { useAppData } from '../context/AppDataContext';
 import { calculateChapterProgress } from '../lib/syllabusUtils';
+import { useLevelProgress } from '../utils/useLevelProgress';
+import { formatMinutesLabel } from '../utils/levelSystem';
+
+function NavbarLevelBadge() {
+  const { levelDetails, totalHours } = useLevelProgress();
+  const [showTooltip, setShowTooltip] = useState(false);
+  const badgeRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (badgeRef.current && !badgeRef.current.contains(e.target)) {
+        setShowTooltip(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const remMinsLabel = formatMinutesLabel(levelDetails.remainingMinsForNext);
+
+  return (
+    <div
+      ref={badgeRef}
+      className="relative flex items-center"
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      <div
+        onClick={() => setShowTooltip((prev) => !prev)}
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500/10 via-indigo-500/10 to-purple-500/10 border border-white/10 hover:border-white/20 backdrop-blur-md transition-all cursor-pointer shadow-[0_0_15px_rgba(99,102,241,0.15)] group"
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
+        <span className="font-mono text-xs font-semibold tracking-wider text-amber-300 group-hover:text-amber-200 transition-colors">
+          LVL {levelDetails.currentLevel}
+        </span>
+      </div>
+
+      {/* Tooltip / Hover Dropdown */}
+      <AnimatePresence>
+        {showTooltip && (
+          <motion.div
+            initial={{ opacity: 0, y: 6, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.95 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+            className="absolute top-full right-0 mt-2.5 w-56 p-3.5 rounded-2xl bg-[#080814]/95 border border-white/15 backdrop-blur-2xl shadow-[0_15px_35px_rgba(0,0,0,0.9)] z-50 font-sans pointer-events-none"
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400 font-bold flex items-center gap-1.5">
+                <Sparkles size={12} className="text-amber-400 animate-spin" />
+                LVL {levelDetails.currentLevel} Progression
+              </span>
+              <span className="text-[10px] font-mono text-slate-300 font-bold">
+                {levelDetails.progressPercent.toFixed(0)}%
+              </span>
+            </div>
+
+            <div className="mt-2.5 space-y-1">
+              <p className="text-xs font-semibold text-white font-mono">
+                {remMinsLabel} until LVL {levelDetails.nextLevel}
+              </p>
+              <p className="text-[11px] text-slate-400 font-mono">
+                Total: {totalHours}h logged
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 export function Header({ onSearchClick, onSelectChapter }) {
   const { user, signOut } = useAuth();
@@ -308,6 +379,9 @@ export function Header({ onSearchClick, onSelectChapter }) {
               </div>
             </div>
           )}
+
+          {/* Level Progression Micro-Badge */}
+          <NavbarLevelBadge />
 
           <MagneticButton strength={0.25}>
 

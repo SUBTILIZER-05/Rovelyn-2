@@ -18,6 +18,7 @@ const DEFAULT_CONTENT = {
   upcomingTests: [],
   sessions: [],
   tasks: [],
+  weeklyTarget: { mode: 'hours', targetHours: 25, targetLevel: 5 },
 };
 
 // Helper to normalize class level representation (e.g., 'C-11', '11', 'Class 11' => '11')
@@ -76,6 +77,9 @@ const saveToLocalStorage = (data, userId, rawContent = null) => {
     if (data.chapters) {
       localStorage.setItem(keys.CHAPTERS_USER, JSON.stringify(data.chapters));
       localStorage.setItem(keys.CHAPTERS_GENERIC, JSON.stringify(data.chapters));
+    }
+    if (data.weeklyTarget) {
+      localStorage.setItem('rovelyn_weekly_target', JSON.stringify(data.weeklyTarget));
     }
   } catch (e) {
     console.warn('Failed to mirror to localStorage:', e);
@@ -187,6 +191,8 @@ const loadFromLocalStorage = (userId) => {
     const chapters = chaptersUserStr ? JSON.parse(chaptersUserStr) : [];
 
     const extractedChapters = extractChaptersFromContent({ chapters, v4_data: v4Data }, userId);
+    const targetStr = localStorage.getItem('rovelyn_weekly_target');
+    const weeklyTarget = targetStr ? JSON.parse(targetStr) : { mode: 'hours', targetHours: 25, targetLevel: 5 };
 
     return {
       tasks: Array.isArray(tasks) ? tasks : [],
@@ -194,6 +200,7 @@ const loadFromLocalStorage = (userId) => {
       pastTests: Array.isArray(pastTests) ? pastTests : [],
       chapters: extractedChapters,
       sessions: [],
+      weeklyTarget,
     };
   } catch (e) {
     console.warn('Failed to load from localStorage:', e);
@@ -261,6 +268,7 @@ export const AppDataProvider = ({ children }) => {
           : [];
         const fetchedSessions = Array.isArray(content.sessions) ? content.sessions : [];
         const fetchedChapters = extractChaptersFromContent(content, user.id);
+        const fetchedWeeklyTarget = content.weekly_target || content.weeklyTarget || { mode: 'hours', targetHours: 25, targetLevel: 5 };
 
         const newAppData = {
           chapters: fetchedChapters,
@@ -268,6 +276,7 @@ export const AppDataProvider = ({ children }) => {
           upcomingTests: fetchedUpcomingTests,
           sessions: fetchedSessions,
           tasks: fetchedTasks,
+          weeklyTarget: fetchedWeeklyTarget,
         };
 
         setAppData(newAppData);
@@ -355,6 +364,7 @@ export const AppDataProvider = ({ children }) => {
           v4_data: v4_data,
           chapters: appData.chapters,
           sessions: appData.sessions,
+          weekly_target: appData.weeklyTarget,
         },
         updated_at: new Date().toISOString(),
       };
@@ -527,6 +537,13 @@ export const AppDataProvider = ({ children }) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
   }, [setTasks]);
 
+  const updateWeeklyTarget = useCallback((updater) => {
+    setAppData((prev) => ({
+      ...prev,
+      weeklyTarget: typeof updater === 'function' ? updater(prev.weeklyTarget) : updater,
+    }));
+  }, []);
+
   return (
     <AppDataContext.Provider
       value={{
@@ -562,6 +579,9 @@ export const AppDataProvider = ({ children }) => {
         setTasks,
         toggleTask,
         deleteTask,
+        // Weekly Target
+        weeklyTarget: appData.weeklyTarget,
+        updateWeeklyTarget,
       }}
     >
 
